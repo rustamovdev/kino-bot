@@ -22,38 +22,39 @@ router = Router()
 
 
 WELCOME_TEXT = (
-    "<b>Assalomu alaykum!</b>\n\n"
-    "<b>Kino botimizga xush kelibsiz.</b>\n\n"
-    "Ushbu bot orqali siz:\n\n"
-    "• <b>Kino nomi bo'yicha izlash</b>\n"
-    "• <b>Tasodifiy kino olish</b>\n"
-    "• <b>Kategoriyalar bo'yicha izlash</b>\n"
-    "• <b>VIP kinolarni ko'rish</b>\n"
-    "• <b>Kino buyurtma qilish</b>\n\n"
-    "imkoniyatiga egasiz.\n\n"
-    "<b>Eslatma:</b>\n"
-    "Kino kodini yoki nomini to'g'ridan-to'g'ri yuborishingiz mumkin."
+    '<tg-emoji emoji-id="5418115103763494597">👋</tg-emoji> <b>Assalomu alaykum!</b>\n\n'
+    '<tg-emoji emoji-id="5368653135101310687">🎬</tg-emoji> <b>Kino botimizga xush kelibsiz.</b>\n\n'
+    '<tg-emoji emoji-id="5371081166013078244">🍿</tg-emoji> <b>Ushbu bot orqali siz:</b>\n\n'
+    '<tg-emoji emoji-id="5429571366384842791">🔎</tg-emoji> <b>Kino nomi bo\'yicha izlash</b>\n'
+    '<tg-emoji emoji-id="5235588635885054955">🎲</tg-emoji> <b>Tasodifiy kino olish</b>\n'
+    '<tg-emoji emoji-id="5341492148468465410">📂</tg-emoji> <b>Kategoriyalar bo\'yicha izlash</b>\n'
+    '<tg-emoji emoji-id="5843804967625821763">💎</tg-emoji> <b>VIP kinolarni ko\'rish</b>\n'
+    '<tg-emoji emoji-id="5258134813302332906">📦</tg-emoji> <b>Kino buyurtma qilish</b>\n\n'
+    'imkoniyatiga egasiz.\n\n'
+    '<tg-emoji emoji-id="6255733820696300839">❗</tg-emoji> <b>Eslatma:</b>\n'
+    'Kino kodini yoki nomini to\'g\'ridan-to\'g\'ri yuborishingiz mumkin.'
 )
 
 HELP_TEXT = (
-    "<b>Yordam bo'limi</b>\n\n"
-    "• Kino kodini bilsangiz — shunchaki raqamni yuboring. Masalan: <code>107</code>\n"
-    "• <b>Kino izlash</b> — kino nomi bo'yicha qidirish\n"
-    "• <b>Random kino</b> — tasodifiy kino olish\n"
-    "• <b>Kategoriyalar</b> — janrlar bo'yicha kinolarni ko'rish\n"
-    "• <b>VIP</b> — VIP a'zolik haqida ma'lumot\n"
-    "• <b>Kino buyurtma qilish</b> — topolmagan kinongizni so'rang\n\n"
-    "Qo'shimcha savollar bo'lsa, administratorga murojaat qiling."
+    '<tg-emoji emoji-id="5458481637362778614">💡</tg-emoji> <b>Yordam bo\'limi</b>\n\n'
+    '<tg-emoji emoji-id="5226513232549664618">🔢</tg-emoji> Kino kodini bilsangiz — shunchaki raqamni yuboring. Masalan: <code>107</code>\n'
+    '<tg-emoji emoji-id="5429571366384842791">🔎</tg-emoji> <b>Kino izlash</b> — kino nomi bo\'yicha qidirish\n'
+    '<tg-emoji emoji-id="5235588635885054955">🎲</tg-emoji> <b>Random kino</b> — tasodifiy kino olish\n'
+    '<tg-emoji emoji-id="5341492148468465410">📂</tg-emoji> <b>Kategoriyalar</b> — janrlar bo\'yicha kinolarni ko\'rish\n'
+    '<tg-emoji emoji-id="5843804967625821763">💎</tg-emoji> <b>VIP</b> — VIP a\'zolik haqida ma\'lumot\n'
+    '<tg-emoji emoji-id="5258134813302332906">📦</tg-emoji> <b>Kino buyurtma qilish</b> — topolmagan kinongizni so\'rang\n\n'
+    '<tg-emoji emoji-id="5458481637362778614">❓</tg-emoji> Qo\'shimcha savollar bo\'lsa, administratorga murojaat qiling.'
 )
 
 VIP_TEXT = (
-    "<b>VIP a'zolik</b>\n\n"
-    "VIP a'zolar uchun maxsus imkoniyatlar:\n\n"
-    "• Eksklyuziv VIP kinolarga kirish\n"
-    "• Tezkor xizmat ko'rsatish\n"
-    "• Maxsus takliflar va yangiliklar\n\n"
-    "VIP a'zolik olish uchun administrator bilan bog'laning."
+    '<tg-emoji emoji-id="5843804967625821763">💎</tg-emoji> <b>VIP a\'zolik</b>\n\n'
+    '✨ VIP a\'zolar uchun maxsus imkoniyatlar:\n\n'
+    '<tg-emoji emoji-id="5368653135101310687">🎬</tg-emoji> Eksklyuziv VIP kinolarga kirish\n'
+    '⚡ Tezkor xizmat ko\'rsatish\n'
+    '🎁 Maxsus takliflar va yangiliklar\n\n'
+    '💬 VIP a\'zolik olish uchun administrator bilan bog\'laning.'
 )
+
 
 
 
