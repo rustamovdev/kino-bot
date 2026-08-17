@@ -1,6 +1,6 @@
 from aiogram import Router, F, Bot
 from aiogram.filters import CommandStart
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 
 import database as db
@@ -8,6 +8,7 @@ from states import UserStates
 from keyboards import (
     main_menu_kb,
     cancel_kb,
+    back_to_main_kb,
     subscribe_kb,
     categories_kb,
     search_results_kb,
@@ -21,38 +22,40 @@ router = Router()
 
 
 WELCOME_TEXT = (
-    "👋 <b>Assalomu alaykum!</b>\n\n"
-    "🎬 Kino botimizga xush kelibsiz.\n\n"
-    "🍿 Ushbu bot orqali siz:\n\n"
-    "🔎 Kino nomi bo'yicha izlash\n"
-    "🎲 Tasodifiy kino olish\n"
-    "📂 Kategoriyalar bo'yicha izlash\n"
-    "💎 VIP kinolarni ko'rish\n"
-    "📦 Kino buyurtma qilish\n\n"
+    "<b>Assalomu alaykum!</b>\n\n"
+    "<b>Kino botimizga xush kelibsiz.</b>\n\n"
+    "Ushbu bot orqali siz:\n\n"
+    "• <b>Kino nomi bo'yicha izlash</b>\n"
+    "• <b>Tasodifiy kino olish</b>\n"
+    "• <b>Kategoriyalar bo'yicha izlash</b>\n"
+    "• <b>VIP kinolarni ko'rish</b>\n"
+    "• <b>Kino buyurtma qilish</b>\n\n"
     "imkoniyatiga egasiz.\n\n"
-    "❗ <b>Eslatma:</b>\n"
-    "Kino kodini yoki nomini vergul va ortiqcha belgilar ishlatmasdan yuboring."
+    "<b>Eslatma:</b>\n"
+    "Kino kodini yoki nomini to'g'ridan-to'g'ri yuborishingiz mumkin."
 )
 
 HELP_TEXT = (
-    "💡 <b>Yordam bo'limi</b>\n\n"
-    "🔹 Kino kodini bilsangiz — shunchaki raqamni yuboring. Masalan: <code>125</code>\n"
-    "🔹 <b>🔎 Kino izlash</b> — kino nomi bo'yicha qidirish\n"
-    "🔹 <b>🎲 Random kino</b> — tasodifiy kino olish\n"
-    "🔹 <b>📂 Kategoriyalar</b> — janrlar bo'yicha kinolarni ko'rish\n"
-    "🔹 <b>💎 VIP</b> — VIP a'zolik haqida ma'lumot\n"
-    "🔹 <b>📦 Kino buyurtma qilish</b> — topolmagan kinongizni so'rang\n\n"
-    "❓ Qo'shimcha savollar bo'lsa, administratorga murojaat qiling."
+    "<b>Yordam bo'limi</b>\n\n"
+    "• Kino kodini bilsangiz — shunchaki raqamni yuboring. Masalan: <code>107</code>\n"
+    "• <b>Kino izlash</b> — kino nomi bo'yicha qidirish\n"
+    "• <b>Random kino</b> — tasodifiy kino olish\n"
+    "• <b>Kategoriyalar</b> — janrlar bo'yicha kinolarni ko'rish\n"
+    "• <b>VIP</b> — VIP a'zolik haqida ma'lumot\n"
+    "• <b>Kino buyurtma qilish</b> — topolmagan kinongizni so'rang\n\n"
+    "Qo'shimcha savollar bo'lsa, administratorga murojaat qiling."
 )
 
 VIP_TEXT = (
-    "💎 <b>VIP a'zolik</b>\n\n"
-    "✨ VIP a'zolar uchun maxsus imkoniyatlar:\n\n"
-    "🎬 Eksklyuziv VIP kinolarga kirish\n"
-    "⚡ Tezkor xizmat ko'rsatish\n"
-    "🎁 Maxsus takliflar va yangiliklar\n\n"
-    "💬 VIP a'zolik olish uchun administrator bilan bog'laning."
+    "<b>VIP a'zolik</b>\n\n"
+    "VIP a'zolar uchun maxsus imkoniyatlar:\n\n"
+    "• Eksklyuziv VIP kinolarga kirish\n"
+    "• Tezkor xizmat ko'rsatish\n"
+    "• Maxsus takliflar va yangiliklar\n\n"
+    "VIP a'zolik olish uchun administrator bilan bog'laning."
 )
+
+
 
 
 async def send_welcome(message: Message):
@@ -84,7 +87,21 @@ async def cmd_start(message: Message, state: FSMContext):
         )
         return
 
+    # Deep-link tekshiruvi: masalan /start movie_123
+    text = message.text or ""
+    parts = text.split(maxsplit=1)
+    if len(parts) > 1 and parts[1].startswith("movie_"):
+        try:
+            code = int(parts[1].replace("movie_", ""))
+            movie = await db.get_movie(code)
+            if movie:
+                await deliver_movie(message.bot, message.chat.id, message.from_user.id, movie)
+                return
+        except ValueError:
+            pass
+
     await send_welcome(message)
+
 
 
 @router.callback_query(F.data == "check_sub")
@@ -96,15 +113,95 @@ async def cb_check_sub(callback: CallbackQuery):
         await callback.answer("❗ Siz hali kanalga a'zo bo'lmadingiz!", show_alert=True)
 
 
+@router.callback_query(F.data == "cancel_action")
+async def cb_cancel_action(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.answer("Bekor qilindi")
+    await edit_ui(callback.message, "🔙 Bekor qilindi.")
+    await answer_ui(callback.message, "🎬 Asosiy menyu:", reply_markup=main_menu_kb())
+
+
+@router.callback_query(F.data == "back_to_main")
+async def cb_back_to_main(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.answer()
+    await edit_ui(callback.message, WELCOME_TEXT, reply_markup=main_menu_kb())
+
+
 @router.message(F.text == "Bekor qilish")
-async def cancel_action(message: Message, state: FSMContext):
+async def cancel_action_msg(message: Message, state: FSMContext):
     await state.clear()
     await answer_ui(message, "🔙 Bekor qilindi.", reply_markup=main_menu_kb())
 
 
+
+# ==================== INLINE MENYU CALLBACK'LARI ====================
+
+@router.callback_query(F.data == "menu_help")
+async def cb_menu_help(callback: CallbackQuery):
+    await callback.answer()
+    await answer_ui(callback.message, HELP_TEXT)
+
+
+@router.callback_query(F.data == "menu_vip")
+async def cb_menu_vip(callback: CallbackQuery):
+    await callback.answer()
+    user_vip = await db.is_vip(callback.from_user.id)
+    text = VIP_TEXT
+    if user_vip:
+        text = "💎 <b>Siz allaqachon VIP a'zosiz!</b>\n\nBarcha VIP kinolar sizga ochiq. 🎉"
+    await answer_ui(callback.message, text, reply_markup=vip_menu_kb(user_vip))
+
+
+@router.callback_query(F.data == "menu_categories")
+async def cb_menu_categories(callback: CallbackQuery):
+    await callback.answer()
+    cats = await db.all_categories()
+    if not cats:
+        await answer_ui(callback.message, "📂 Hozircha kategoriyalar mavjud emas.")
+        return
+    await answer_ui(callback.message,
+        "📂 <b>Quyidagi kategoriyalardan birini tanlang:</b>",
+        reply_markup=categories_kb(cats),
+    )
+
+
+@router.callback_query(F.data == "menu_order")
+async def cb_menu_order(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await state.set_state(UserStates.waiting_order_text)
+    await answer_ui(callback.message,
+        "📦 <b>Qaysi kinoni topa olmadingiz?</b>\n\n"
+        "Kino nomini (yil va janri bilan bo'lsa, yanada yaxshi) yozib yuboring:",
+        reply_markup=cancel_kb(),
+    )
+
+
+@router.callback_query(F.data == "menu_random")
+async def cb_menu_random(callback: CallbackQuery):
+    await callback.answer()
+    movie = await db.random_movie()
+    if not movie:
+        await answer_ui(callback.message, "😔 Hozircha bazada kinolar mavjud emas.")
+        return
+    await deliver_movie(callback.bot, callback.message.chat.id, callback.from_user.id, movie)
+
+
+@router.callback_query(F.data == "menu_search")
+async def cb_menu_search(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await state.set_state(UserStates.waiting_search_query)
+    await answer_ui(callback.message,
+        "🔎 <b>Qidirmoqchi bo'lgan kino nomini yozing:</b>",
+        reply_markup=cancel_kb(),
+    )
+
+
+# ==================== ESKI MATN HANDLER'LAR (Reply KB uchun fallback) ====================
+
 @router.message(F.text == "Yordam")
 async def help_menu(message: Message):
-    await answer_ui(message, HELP_TEXT, reply_markup=main_menu_kb())
+    await answer_ui(message, HELP_TEXT)
 
 
 @router.message(F.text == "VIP")
@@ -116,23 +213,23 @@ async def vip_menu(message: Message):
     await answer_ui(message, text, reply_markup=vip_menu_kb(user_vip))
 
 
-@router.callback_query(F.data == "vip_info")
-async def vip_info_cb(callback: CallbackQuery):
-    await callback.answer()
-    await answer_ui(callback.message, 
-        "💬 VIP a'zolik olish uchun administratorga yozing."
-    )
-
-
 @router.message(F.text == "Kategoriyalar")
 async def categories_menu(message: Message):
     cats = await db.all_categories()
     if not cats:
         await answer_ui(message, "📂 Hozircha kategoriyalar mavjud emas.")
         return
-    await answer_ui(message, 
+    await answer_ui(message,
         "📂 <b>Quyidagi kategoriyalardan birini tanlang:</b>",
         reply_markup=categories_kb(cats),
+    )
+
+
+@router.callback_query(F.data == "vip_info")
+async def vip_info_cb(callback: CallbackQuery):
+    await callback.answer()
+    await answer_ui(callback.message,
+        "💬 VIP a'zolik olish uchun administratorga yozing."
     )
 
 
@@ -144,7 +241,7 @@ async def category_movies_cb(callback: CallbackQuery):
     if not movies:
         await answer_ui(callback.message, f"📂 <b>{category}</b> kategoriyasida hozircha kino yo'q.")
         return
-    await answer_ui(callback.message, 
+    await answer_ui(callback.message,
         f"📂 <b>{category}</b> kategoriyasidagi kinolar:",
         reply_markup=search_results_kb(movies),
     )
@@ -162,7 +259,7 @@ async def random_movie_handler(message: Message):
 @router.message(F.text == "Kino izlash")
 async def search_start(message: Message, state: FSMContext):
     await state.set_state(UserStates.waiting_search_query)
-    await answer_ui(message, 
+    await answer_ui(message,
         "🔎 <b>Qidirmoqchi bo'lgan kino nomini yozing:</b>",
         reply_markup=cancel_kb(),
     )
@@ -228,10 +325,12 @@ async def deliver_movie(bot: Bot, chat_id: int, user_id: int, movie):
         )
         return
     try:
+        # copy_message — forward qilish bloklanadi (protect_content yo'q, lekin original kanal ko'rinmaydi)
         await bot.copy_message(
             chat_id=chat_id,
             from_chat_id=CHANNEL_ID,
             message_id=movie["code"],
+            protect_content=True,
         )
     except Exception:
         await send_ui(bot, 
@@ -266,6 +365,7 @@ async def movie_by_code(message: Message, state: FSMContext):
                 chat_id=message.chat.id,
                 from_chat_id=CHANNEL_ID,
                 message_id=code,
+                protect_content=True,
             )
         except Exception:
             await answer_ui(message,

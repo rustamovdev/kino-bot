@@ -17,8 +17,10 @@ CHANNEL_ID = os.getenv("CHANNEL_ID", "")
 # Majburiy obuna kanali (masalan: @mychannel). Bo'sh qoldirilsa, majburiy obuna o'chirilgan bo'ladi.
 REQUIRED_CHANNEL = os.getenv("REQUIRED_CHANNEL", "")
 
-# Ma'lumotlar bazasi fayli
+# Ma'lumotlar bazasi fayli (SQLite) yoki Supabase PostgreSQL havolasi
 DB_PATH = os.getenv("DB_PATH", "bot.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+
 
 # Start xabarida yuboriladigan premium animatsiyali stiker file_id
 STICKER_ID = os.getenv("STICKER_ID", "")

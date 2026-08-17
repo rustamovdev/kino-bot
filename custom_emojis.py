@@ -6,7 +6,7 @@ If an ID is empty, the bot falls back to the normal Unicode emoji.
 """
 
 CUSTOM_EMOJIS: dict[str, str] = {
-    "movie": "5375464961822695044",
+    "movie": "5368653135101310687",
     "search": "5429571366384842791",
     "settings": "5341715473882955310",
     "statistics": "5458905456145612048",
@@ -23,9 +23,10 @@ CUSTOM_EMOJIS: dict[str, str] = {
     "channel": "5402108679774282930",
     "admin": "5422364797809230911",
     "home": "6255948496046657099",
-    "categories": "5373098009640836781",
+    "categories": "5341492148468465410",
     "help": "5458481637362778614",
     "confirm": "5260416304224936047",
+    "vip": "5843804967625821763",
     "genre": "5350658016700013471",
     "year": "5274055917766202507",
     "code": "5226513232549664618",
@@ -33,20 +34,21 @@ CUSTOM_EMOJIS: dict[str, str] = {
     "test": "5411138633765757782",
     "tech": "5258023599419171861",
 
-    # Qo'shimcha UI emojilari. ID topilsa shu yerga kiriting.
-    # ID bo'sh qolsa, bot avtomatik Unicode emoji ishlatadi.
-    "greeting": "",
-    "popcorn": "",
-    "random": "",
+
+    # Qo'shimcha UI emojilari
+    "greeting": "5418115103763494597",
+    "popcorn": "5371081166013078244",
+    "random": "5235588635885054955",
     "lightbulb": "",
-    "vip": "",
-    "package": "",
-    "alert": "",
+    "package": "5258134813302332906",
+    "alert": "6255733820696300839",
+
+
     "question": "",
     "sparkles": "",
     "bolt": "",
     "gift": "",
-    "down": "",
+    "down": "5470177992950946662",
     "pray": "",
     "sad": "",
     "id_card": "",
@@ -58,7 +60,7 @@ CUSTOM_EMOJIS: dict[str, str] = {
     "plus": "",
     "minus": "",
     "ban": "",
-    "folder": "",
+    "folder": "5341492148468465410",
     "tools": "",
     "trash": "",
     "paperclip": "",

@@ -9,7 +9,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from config import BOT_TOKEN
 import database as db
 from emoji_helper import validate_custom_emojis
-from handlers import admin, user
+from handlers import admin, user, inline
 
 
 logging.basicConfig(
@@ -46,10 +46,22 @@ async def main():
     # Admin router birinchi bo'lib ulanadi (ustuvorlik uchun)
     dp.include_router(admin.router)
     dp.include_router(user.router)
+    dp.include_router(inline.router)
+
+    from aiogram.types import BotCommand, BotCommandScopeDefault
+
+    # Bot buyruqlari menyusi (/ bosganda chiqadigan buyruqlar)
+    commands = [
+        BotCommand(command="start", description="🎬 Botni ishga tushirish / Asosiy menyu"),
+        BotCommand(command="admin", description="🛠 Admin panel (Faqat adminlar uchun)"),
+    ]
+    await bot.set_my_commands(commands, scope=BotCommandScopeDefault())
 
     await bot.delete_webhook(drop_pending_updates=True)
     logging.info("🤖 Bot ishga tushdi...")
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+
+
 
 
 if __name__ == "__main__":
