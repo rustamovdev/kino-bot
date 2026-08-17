@@ -1,0 +1,59 @@
+import asyncio
+import logging
+
+from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.fsm.storage.memory import MemoryStorage
+
+from config import BOT_TOKEN
+import database as db
+from emoji_helper import validate_custom_emojis
+from handlers import admin, user
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+)
+
+
+async def main():
+    if not BOT_TOKEN:
+        raise RuntimeError(
+            "❗ BOT_TOKEN topilmadi! .env faylida BOT_TOKEN qiymatini kiriting."
+        )
+
+    await db.init_db()
+
+    bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+
+    # Validate the configured Telegram Custom Emoji IDs before the bot starts
+    # serving users. Invalid IDs are automatically treated as Unicode fallback.
+    try:
+        valid_ids, emoji_status = await validate_custom_emojis(bot)
+        logging.info("Custom Emoji: %d/%d ID Telegram tomonidan tasdiqlandi.", len(valid_ids), len(emoji_status))
+        if "_global" in emoji_status:
+            logging.warning(emoji_status["_global"])
+        for key, status in emoji_status.items():
+            if key != "_global" and status != "OK":
+                logging.warning("Custom Emoji [%s]: %s", key, status)
+    except Exception:
+        logging.exception("Custom Emoji tekshiruvida kutilmagan xato. Unicode fallback ishlatiladi.")
+
+    dp = Dispatcher(storage=MemoryStorage())
+
+    # Admin router birinchi bo'lib ulanadi (ustuvorlik uchun)
+    dp.include_router(admin.router)
+    dp.include_router(user.router)
+
+    await bot.delete_webhook(drop_pending_updates=True)
+    logging.info("🤖 Bot ishga tushdi...")
+    await dp.start_polling(bot)
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logging.info("🛑 Bot to'xtatildi.")

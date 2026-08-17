@@ -1,0 +1,19 @@
+services:
+  - type: worker
+    name: kino-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
+      - key: CHANNEL_ID
+        sync: false
+      - key: REQUIRED_CHANNEL
+        sync: false
+      - key: DB_PATH
+        value: bot.db
+      - key: BACKUP_DIR
+        value: backups
