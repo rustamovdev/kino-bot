@@ -2,9 +2,11 @@
 Database layer supporting both SQLite (local) and PostgreSQL (Supabase).
 Automatically detects DATABASE_URL from config / environment.
 """
+import asyncio
 import datetime
 import logging
 from config import DB_PATH, DATABASE_URL
+
 
 # PostgreSQL pool instance
 _pg_pool = None
@@ -15,7 +17,8 @@ def now() -> str:
 
 
 def is_postgres() -> bool:
-    return bool(DATABASE_URL and DATABASE_URL.strip().startswith(("postgres://", "postgresql://")))
+    return _pg_pool is not None
+
 
 
 # ---------------- INITIALIZATION ----------------
@@ -101,33 +104,35 @@ CREATE TABLE IF NOT EXISTS settings (
 
 async def init_db():
     global _pg_pool
-    if is_postgres():
+    if DATABASE_URL and DATABASE_URL.strip().startswith(("postgres://", "postgresql://")):
         import asyncpg
         dsn = DATABASE_URL.replace("postgres://", "postgresql://")
         try:
-            _pg_pool = await asyncpg.create_pool(dsn=dsn, min_size=1, max_size=10, ssl="require")
-            logging.info("🐘 PostgreSQL (Supabase) ulandi!")
+            logging.info("🐘 PostgreSQL (Supabase) ga ulanish urinilmoqda...")
+            _pg_pool = await asyncio.wait_for(
+                asyncpg.create_pool(dsn=dsn, min_size=1, max_size=10, ssl="require"),
+                timeout=12.0,
+            )
+            logging.info("🐘 PostgreSQL (Supabase) muvaffaqiyatli ulandi!")
             async with _pg_pool.acquire() as conn:
                 for statement in PG_SCHEMA.strip().split(";"):
                     stmt = statement.strip()
                     if stmt:
                         await conn.execute(stmt)
                 await conn.execute("INSERT INTO categories (name) VALUES ('Umumiy') ON CONFLICT (name) DO NOTHING")
+            return
         except Exception as e:
             logging.error(f"PostgreSQL ulanishda xatolik: {e}")
             logging.info("📁 Zaxira rejim: SQLite ishlatilmoqda...")
-            import aiosqlite
             _pg_pool = None
-            async with aiosqlite.connect(DB_PATH) as db:
-                await db.executescript(SQLITE_SCHEMA)
-                await db.commit()
-    else:
-        import aiosqlite
-        async with aiosqlite.connect(DB_PATH) as db:
-            await db.executescript(SQLITE_SCHEMA)
-            await db.execute("INSERT OR IGNORE INTO categories (name) VALUES ('Umumiy')")
-            await db.commit()
-        logging.info("📁 SQLite (lokal baza) ulandi!")
+
+    import aiosqlite
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.executescript(SQLITE_SCHEMA)
+        await db.execute("INSERT OR IGNORE INTO categories (name) VALUES ('Umumiy')")
+        await db.commit()
+    logging.info("📁 SQLite (lokal baza) ulandi!")
+
 
 
 
