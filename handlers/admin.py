@@ -421,12 +421,12 @@ async def index_channel_start(event: Message | CallbackQuery, state: FSMContext)
         "🔄 <b>Kanal indekslash boshlandi...</b>\n\nIltimos kuting, bu biroz vaqt olishi mumkin."
     )
 
-    start_code = await db.last_movie_code() + 1
+    start_code = 1
     added = 0
     empty_streak = 0
     checked = 0
-    max_checked = 3000
-    max_empty_streak = 25
+    max_checked = 2000
+    max_empty_streak = 40
 
     code = start_code
     while empty_streak < max_empty_streak and checked < max_checked:
