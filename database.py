@@ -110,7 +110,13 @@ async def init_db():
         try:
             logging.info("🐘 PostgreSQL (Supabase) ga ulanish urinilmoqda...")
             _pg_pool = await asyncio.wait_for(
-                asyncpg.create_pool(dsn=dsn, min_size=1, max_size=10, ssl="require"),
+                asyncpg.create_pool(
+                    dsn=dsn,
+                    min_size=1,
+                    max_size=10,
+                    ssl="require",
+                    statement_cache_size=0,
+                ),
                 timeout=12.0,
             )
             logging.info("🐘 PostgreSQL (Supabase) muvaffaqiyatli ulandi!")
