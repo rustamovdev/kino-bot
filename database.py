@@ -414,7 +414,7 @@ async def search_movies(query: str, limit: int = 50, offset: int = 0):
     if is_postgres():
         async with _pg_pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT * FROM movies WHERE title ILIKE $1 OR CAST(code AS TEXT) LIKE $1 ORDER BY added_at DESC LIMIT $2 OFFSET $3",
+                "SELECT * FROM movies WHERE title ILIKE $1 OR CAST(code AS TEXT) LIKE $1 ORDER BY code DESC, id DESC LIMIT $2 OFFSET $3",
                 f"%{query}%", limit, offset
             )
             return [dict(r) for r in rows]
@@ -423,7 +423,7 @@ async def search_movies(query: str, limit: int = 50, offset: int = 0):
         async with aiosqlite.connect(DB_PATH) as db:
             db.row_factory = aiosqlite.Row
             cur = await db.execute(
-                "SELECT * FROM movies WHERE title LIKE ? OR CAST(code AS TEXT) LIKE ? ORDER BY added_at DESC LIMIT ? OFFSET ?",
+                "SELECT * FROM movies WHERE title LIKE ? OR CAST(code AS TEXT) LIKE ? ORDER BY code DESC, id DESC LIMIT ? OFFSET ?",
                 (f"%{query}%", f"%{query}%", limit, offset),
             )
             rows = await cur.fetchall()
@@ -434,7 +434,7 @@ async def movies_by_category(category: str, limit: int = 30):
     if is_postgres():
         async with _pg_pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT * FROM movies WHERE category = $1 ORDER BY added_at DESC LIMIT $2",
+                "SELECT * FROM movies WHERE category = $1 ORDER BY code DESC, id DESC LIMIT $2",
                 category, limit
             )
             return [dict(r) for r in rows]
@@ -443,7 +443,7 @@ async def movies_by_category(category: str, limit: int = 30):
         async with aiosqlite.connect(DB_PATH) as db:
             db.row_factory = aiosqlite.Row
             cur = await db.execute(
-                "SELECT * FROM movies WHERE category=? ORDER BY added_at DESC LIMIT ?",
+                "SELECT * FROM movies WHERE category=? ORDER BY code DESC, id DESC LIMIT ?",
                 (category, limit),
             )
             rows = await cur.fetchall()

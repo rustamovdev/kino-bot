@@ -301,7 +301,8 @@ async def edit_movie_cat_start(callback: CallbackQuery, state: FSMContext):
     cats = await db.all_categories()
     builder = InlineKeyboardBuilder()
     for c in cats:
-        builder.button(text=c["name"], callback_data=f"editcatpick:{c['name']}")
+        _ikb_button(builder, "categories", str(c["name"]), callback_data=f"editcatpick:{c['name']}", style=ButtonStyle.PRIMARY)
+    _ikb_button(builder, "cancel", "Bekor qilish", callback_data="cancel_action", style=ButtonStyle.DANGER)
     builder.adjust(2)
     await callback.answer()
     await answer_ui(callback.message, 
@@ -379,8 +380,8 @@ async def admcat_del_start(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
     for c in cats:
         if c["name"] != "Umumiy":
-            builder.button(text=f"🗑 {c['name']}", callback_data=f"catdel:{c['name']}")
-    builder.button(text="🔙 Orqaga", callback_data="adm_categories")
+            _ikb_button(builder, "delete", f"{c['name']}", callback_data=f"catdel:{c['name']}", style=ButtonStyle.DANGER)
+    _ikb_button(builder, "back", "Orqaga", callback_data="adm_categories", style=ButtonStyle.PRIMARY)
     builder.adjust(2)
     await callback.answer()
     await edit_ui(callback.message, "🗑 <b>O'chirmoqchi bo'lgan kategoriyani tanlang:</b>", reply_markup=builder.as_markup())
@@ -402,7 +403,7 @@ async def admcat_list_cb(callback: CallbackQuery):
     for idx, c in enumerate(cats, start=1):
         text += f"{idx}. {c['name']}\n"
     builder = InlineKeyboardBuilder()
-    builder.button(text="🔙 Orqaga", callback_data="adm_categories")
+    _ikb_button(builder, "back", "Orqaga", callback_data="adm_categories", style=ButtonStyle.PRIMARY)
     await edit_ui(callback.message, text, reply_markup=builder.as_markup())
 
 
@@ -674,15 +675,15 @@ async def vip_users_menu(event: Message | CallbackQuery):
         await event.answer()
     vips = await db.vip_users()
     builder = InlineKeyboardBuilder()
-    builder.button(text="➕ VIP qo'shish", callback_data="vip_add_start")
+    _ikb_button(builder, "confirm", "➕ VIP qo'shish", callback_data="vip_add_start", style=ButtonStyle.SUCCESS)
     text = f"💎 <b>VIP foydalanuvchilar: {len(vips)} ta</b>\n\n"
     if vips:
         for v in vips[:20]:
             uname = f"@{v['username']}" if v["username"] else "—"
             until = v["vip_until"] or "cheksiz"
             text += f"• <code>{v['user_id']}</code> ({uname}) — {until} gacha\n"
-            builder.button(text=f"❌ {v['user_id']}", callback_data=f"vip_remove:{v['user_id']}")
-    builder.button(text="Admin panel", callback_data="adm_back_to_panel")
+            _ikb_button(builder, "delete", f"❌ {v['user_id']}", callback_data=f"vip_remove:{v['user_id']}", style=ButtonStyle.DANGER)
+    _ikb_button(builder, "home", "🔙 Admin panel", callback_data="adm_back_to_panel", style=ButtonStyle.PRIMARY)
     builder.adjust(1)
     await answer_ui(msg, text, reply_markup=builder.as_markup())
 
@@ -818,9 +819,9 @@ async def settings_menu(event: Message | CallbackQuery):
     channel = await get_required_channel()
     channel_text = channel if channel else "o'rnatilmagan"
     builder = InlineKeyboardBuilder()
-    builder.button(text="📢 Majburiy kanalni o'zgartirish", callback_data="set_req_channel")
-    builder.button(text="🗑 Majburiy kanalni o'chirish", callback_data="del_req_channel")
-    builder.button(text="Admin panel", callback_data="adm_back_to_panel")
+    _ikb_button(builder, "channel", "📢 Majburiy kanalni o'zgartirish", callback_data="set_req_channel", style=ButtonStyle.PRIMARY)
+    _ikb_button(builder, "delete", "🗑 Majburiy kanalni o'chirish", callback_data="del_req_channel", style=ButtonStyle.DANGER)
+    _ikb_button(builder, "home", "🔙 Admin panel", callback_data="adm_back_to_panel", style=ButtonStyle.PRIMARY)
     builder.adjust(1)
     await answer_ui(msg, 
         "⚙ <b>Bot sozlamalari</b>\n\n"
@@ -962,6 +963,7 @@ def _emoji_test_kb():
             text=key,
             icon_custom_emoji_id=icon_id,
             callback_data=f"emoji_test:{key}",
+            style=ButtonStyle.PRIMARY,
         )
     builder.adjust(2)
     return builder.as_markup()

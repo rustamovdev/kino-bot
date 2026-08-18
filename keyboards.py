@@ -140,7 +140,8 @@ def search_results_kb(movies: list) -> InlineKeyboardMarkup:
     for m in movies:
         key = "confirm" if m["is_vip"] else "movie"
         style = ButtonStyle.SUCCESS if m["is_vip"] else ButtonStyle.PRIMARY
-        _ikb_button(builder, key, str(m["title"]), callback_data=f"movie:{m['code']}", style=style)
+        title_str = f"#{m['code']} | {m['title']}"
+        _ikb_button(builder, key, title_str, callback_data=f"movie:{m['code']}", style=style)
     builder.adjust(1)
     return builder.as_markup()
 
