@@ -5,6 +5,7 @@ import datetime
 
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
+from aiogram.enums import ButtonStyle
 from aiogram.types import Message, CallbackQuery, MessageOriginChannel, FSInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -25,6 +26,7 @@ from keyboards import (
 from config import ADMIN_IDS, CHANNEL_ID, DB_PATH, BACKUP_DIR
 from emoji_helper import answer_ui, send_ui, edit_ui, validate_custom_emojis, valid_custom_emoji_id
 from custom_emojis import CUSTOM_EMOJIS, EMOJI_FALLBACKS
+from utils import get_required_channel
 
 router = Router()
 router.message.filter(F.from_user.id.in_(ADMIN_IDS))
@@ -194,6 +196,45 @@ async def delete_movie_start(event: Message | CallbackQuery, state: FSMContext):
     )
 
 
+@router.message(AdminStates.delete_waiting_code)
+async def delete_movie_get_code(message: Message, state: FSMContext):
+    if not message.text or not message.text.strip().isdigit():
+        await answer_ui(message, "❗ Iltimos, faqat raqamli kod kiriting.")
+        return
+    code = int(message.text.strip())
+    movie = await db.get_movie(code)
+    await state.clear()
+    if not movie:
+        await answer_ui(message, "😔 Bunday kodli kino topilmadi.", reply_markup=admin_menu_kb())
+        return
+
+    await answer_ui(
+        message,
+        f"🗑 <b>Kinoni o'chirishni tasdiqlaysizmi?</b>\n\n"
+        f"🎬 <b>{movie['title']}</b>\n"
+        f"🔢 Kod: <code>{code}</code>\n"
+        f"📂 Kategoriya: {movie.get('category', 'Umumiy')}",
+        reply_markup=confirm_kb("del_movie", code),
+    )
+
+
+@router.callback_query(F.data.startswith("confirm:"))
+async def confirm_action_cb(callback: CallbackQuery, state: FSMContext):
+    parts = callback.data.split(":")
+    action = parts[1]
+    param = parts[2] if len(parts) > 2 else ""
+
+    if action == "del_movie":
+        code = int(param)
+        deleted = await db.delete_movie(code)
+        await callback.answer("O'chirildi" if deleted else "Topilmadi")
+        if deleted:
+            await edit_ui(callback.message, f"✅ <code>{code}</code> kodli kino muvaffaqiyatli o'chirildi.")
+        else:
+            await edit_ui(callback.message, f"❌ <code>{code}</code> kodli kino topilmadi yoki allaqachon o'chirilgan.")
+        await answer_ui(callback.message, "🛠 Admin panel:", reply_markup=admin_menu_kb())
+
+
 # ==================== KINO TAHRIRLASH ====================
 
 
@@ -311,6 +352,60 @@ async def admin_categories_menu(event: Message | CallbackQuery):
     )
 
 
+@router.callback_query(F.data == "admcat_add")
+async def admcat_add_start(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(AdminStates.category_waiting_name)
+    await callback.answer()
+    await answer_ui(callback.message, "➕ <b>Yangi kategoriya nomini kiriting:</b>", reply_markup=cancel_kb())
+
+
+@router.message(AdminStates.category_waiting_name)
+async def admcat_add_process(message: Message, state: FSMContext):
+    name = message.text.strip()
+    await state.clear()
+    success = await db.add_category(name)
+    if success:
+        await answer_ui(message, f"✅ <b>'{name}'</b> kategoriyasi qo'shildi!", reply_markup=admin_categories_kb())
+    else:
+        await answer_ui(message, f"⚠️ <b>'{name}'</b> kategoriyasi allaqachon mavjud!", reply_markup=admin_categories_kb())
+
+
+@router.callback_query(F.data == "admcat_del")
+async def admcat_del_start(callback: CallbackQuery):
+    cats = await db.all_categories()
+    if not cats:
+        await callback.answer("Kategoriyalar yo'q", show_alert=True)
+        return
+    builder = InlineKeyboardBuilder()
+    for c in cats:
+        if c["name"] != "Umumiy":
+            builder.button(text=f"🗑 {c['name']}", callback_data=f"catdel:{c['name']}")
+    builder.button(text="🔙 Orqaga", callback_data="adm_categories")
+    builder.adjust(2)
+    await callback.answer()
+    await edit_ui(callback.message, "🗑 <b>O'chirmoqchi bo'lgan kategoriyani tanlang:</b>", reply_markup=builder.as_markup())
+
+
+@router.callback_query(F.data.startswith("catdel:"))
+async def admcat_del_process(callback: CallbackQuery):
+    name = callback.data.split(":", 1)[1]
+    deleted = await db.delete_category(name)
+    await callback.answer("O'chirildi" if deleted else "Xatolik")
+    await edit_ui(callback.message, f"✅ <b>'{name}'</b> kategoriyasi o'chirildi.", reply_markup=admin_categories_kb())
+
+
+@router.callback_query(F.data == "admcat_list")
+async def admcat_list_cb(callback: CallbackQuery):
+    cats = await db.all_categories()
+    await callback.answer()
+    text = f"📂 <b>Kategoriyalar ro'yxati ({len(cats)} ta):</b>\n\n"
+    for idx, c in enumerate(cats, start=1):
+        text += f"{idx}. {c['name']}\n"
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 Orqaga", callback_data="adm_categories")
+    await edit_ui(callback.message, text, reply_markup=builder.as_markup())
+
+
 # ==================== KANALNI INDEKSLASH ====================
 
 @router.callback_query(F.data == "adm_index_channel")
@@ -397,6 +492,28 @@ async def orders_list(event: Message | CallbackQuery):
         await answer_ui(msg, text, reply_markup=order_action_kb(o["id"]))
 
 
+@router.callback_query(F.data.startswith("order_done:"))
+async def order_done_cb(callback: CallbackQuery, bot: Bot):
+    order_id = int(callback.data.split(":", 1)[1])
+    order = await db.get_order(order_id)
+    await db.close_order(order_id)
+    await callback.answer("✅ Bajarildi deb belgilandi")
+    await edit_ui(callback.message, f"✅ Buyurtma #{order_id} <b>bajarildi</b> deb belgilandi.")
+
+    # Notify ordering user if found
+    if order and order.get("user_id"):
+        try:
+            await send_ui(
+                bot,
+                order["user_id"],
+                f"🎬 <b>Siz so'ragan kino qo'shildi!</b>\n\n"
+                f"🍿 <b>So'rov:</b> <i>{order['text']}</i>\n"
+                "Kino qidirish yoki kod orqali tomosha qilishingiz mumkin! 🎉",
+            )
+        except Exception:
+            pass
+
+
 # ==================== FOYDALANUVCHILAR ====================
 
 @router.callback_query(F.data == "adm_users")
@@ -460,6 +577,93 @@ async def broadcast_start(event: Message | CallbackQuery, state: FSMContext):
     )
 
 
+@router.message(AdminStates.broadcast_waiting_content)
+async def broadcast_get_content(message: Message, state: FSMContext):
+    await state.update_data(from_chat_id=message.chat.id, message_id=message.message_id)
+    total_users = await db.users_count()
+    await answer_ui(
+        message,
+        f"📢 <b>Reklama xabari qabul qilindi.</b>\n\n"
+        f"👥 Qabul qiluvchilar soni: <b>{total_users} ta foydalanuvchi</b>\n\n"
+        "Haqiqatan ham ushbu xabarni barcha foydalanuvchilarga yubormoqchimisiz?",
+        reply_markup=broadcast_confirm_kb(),
+    )
+
+
+@router.callback_query(F.data == "bcast_send")
+async def broadcast_send_cb(callback: CallbackQuery, state: FSMContext, bot: Bot):
+    data = await state.get_data()
+    from_chat_id = data.get("from_chat_id")
+    message_id = data.get("message_id")
+    await state.clear()
+    await callback.answer("Yuborish boshlandi...")
+
+    if not from_chat_id or not message_id:
+        await edit_ui(callback.message, "❌ Xatolik yuz berdi. Reklama xabari topilmadi.")
+        await answer_ui(callback.message, "🛠 Admin panel:", reply_markup=admin_menu_kb())
+        return
+
+    users = await db.all_users()
+    total = len(users)
+    sent = 0
+    blocked = 0
+    failed = 0
+
+    status_msg = await edit_ui(
+        callback.message,
+        f"⏳ <b>Xabar yuborilmoqda...</b>\n\n"
+        f"📊 Jami: {total}\n"
+        f"✅ Yuborildi: {sent}\n"
+        f"🚫 Bloklagan: {blocked}\n"
+        f"❌ Xatolik: {failed}",
+    )
+
+    for idx, u in enumerate(users, start=1):
+        uid = u["user_id"]
+        try:
+            await bot.copy_message(chat_id=uid, from_chat_id=from_chat_id, message_id=message_id)
+            sent += 1
+        except Exception as e:
+            err_str = str(e).lower()
+            if "blocked" in err_str or "chat not found" in err_str or "user is deactivated" in err_str:
+                blocked += 1
+            else:
+                failed += 1
+
+        if idx % 25 == 0 or idx == total:
+            try:
+                await edit_ui(
+                    status_msg,
+                    f"⏳ <b>Xabar yuborilmoqda...</b>\n\n"
+                    f"📊 Jami: {total}\n"
+                    f"✅ Yuborildi: {sent}\n"
+                    f"🚫 Bloklagan: {blocked}\n"
+                    f"❌ Xatolik: {failed}\n"
+                    f"📈 Jarayon: {int((idx / total) * 100)}%",
+                )
+            except Exception:
+                pass
+        await asyncio.sleep(0.04)
+
+    await edit_ui(
+        status_msg,
+        f"📢 <b>Reklama yuborish yakunlandi!</b>\n\n"
+        f"📊 Jami foydalanuvchilar: <b>{total}</b>\n"
+        f"✅ Muvaffaqiyatli yetkazildi: <b>{sent}</b>\n"
+        f"🚫 Botni bloklaganlar: <b>{blocked}</b>\n"
+        f"❌ Boshqa xatoliklar: <b>{failed}</b>",
+    )
+    await answer_ui(callback.message, "🛠 Admin panel:", reply_markup=admin_menu_kb())
+
+
+@router.callback_query(F.data == "bcast_cancel")
+async def broadcast_cancel_cb(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.answer("Bekor qilindi")
+    await edit_ui(callback.message, "❌ Reklama yuborish bekor qilindi.")
+    await answer_ui(callback.message, "🛠 Admin panel:", reply_markup=admin_menu_kb())
+
+
 # ==================== VIP FOYDALANUVCHILAR ====================
 
 @router.callback_query(F.data == "adm_vip_users")
@@ -483,6 +687,75 @@ async def vip_users_menu(event: Message | CallbackQuery):
     await answer_ui(msg, text, reply_markup=builder.as_markup())
 
 
+@router.callback_query(F.data == "vip_add_start")
+async def vip_add_start_cb(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(AdminStates.vip_waiting_id)
+    await callback.answer()
+    await answer_ui(callback.message, "💎 <b>VIP bermoqchi bo'lgan foydalanuvchi ID sini kiriting:</b>", reply_markup=cancel_kb())
+
+
+@router.message(AdminStates.vip_waiting_id)
+async def vip_get_id(message: Message, state: FSMContext):
+    if not message.text or not message.text.strip().isdigit():
+        await answer_ui(message, "❗ Iltimos, to'g'ri raqamli ID kiriting.")
+        return
+    user_id = int(message.text.strip())
+    await state.update_data(target_user_id=user_id)
+    await state.set_state(AdminStates.vip_waiting_days)
+    await answer_ui(message, f"👤 Foydalanuvchi: <code>{user_id}</code>\n\n🗓 <b>Necha kunga VIP berilsin?</b> (masalan: 30):", reply_markup=cancel_kb())
+
+
+@router.message(AdminStates.vip_waiting_days)
+async def vip_get_days(message: Message, state: FSMContext, bot: Bot):
+    if not message.text or not message.text.strip().isdigit():
+        await answer_ui(message, "❗ Iltimos, kunlar sonini raqamda kiriting (masalan: 30).")
+        return
+    days = int(message.text.strip())
+    data = await state.get_data()
+    user_id = data.get("target_user_id")
+    await state.clear()
+
+    if not user_id:
+        await answer_ui(message, "❌ Xatolik yuz berdi.", reply_markup=admin_menu_kb())
+        return
+
+    until = await db.set_vip(user_id, days)
+    await answer_ui(
+        message,
+        f"✅ <code>{user_id}</code> ga <b>{days} kunlik</b> VIP a'zolik berildi!\n\n"
+        f"🕒 Muddati: <b>{until}</b> gacha.",
+        reply_markup=admin_menu_kb(),
+    )
+    # Foydalanuvchini xabardor qilish
+    try:
+        await send_ui(
+            bot,
+            user_id,
+            f"🎉 <b>Tabriklaymiz! Sizga {days} kunlik VIP a'zolik berildi!</b>\n\n"
+            f"🕒 Muddati: <b>{until}</b> gacha.\n"
+            "Endi barcha VIP kinolarni cheklovlarsiz tomosha qilishingiz mumkin. 💎",
+        )
+    except Exception:
+        pass
+
+
+@router.callback_query(F.data.startswith("vip_remove:"))
+async def vip_remove_cb(callback: CallbackQuery, bot: Bot):
+    user_id = int(callback.data.split(":", 1)[1])
+    await db.remove_vip(user_id)
+    await callback.answer("VIP olib tashlandi")
+    await edit_ui(callback.message, f"➖ <code>{user_id}</code> dan VIP holati olib tashlandi.")
+    try:
+        await send_ui(
+            bot,
+            user_id,
+            "ℹ️ <b>Sizning VIP a'zolik muddatingiz yakunlandi.</b>",
+        )
+    except Exception:
+        pass
+    await answer_ui(callback.message, "🛠 Admin panel:", reply_markup=admin_menu_kb())
+
+
 # ==================== BAN / UNBAN ====================
 
 @router.callback_query(F.data == "adm_ban")
@@ -498,6 +771,17 @@ async def ban_start(event: Message | CallbackQuery, state: FSMContext):
     )
 
 
+@router.message(AdminStates.ban_waiting_id)
+async def ban_process(message: Message, state: FSMContext):
+    if not message.text or not message.text.strip().isdigit():
+        await answer_ui(message, "❗ Iltimos, to'g'ri raqamli ID kiriting.")
+        return
+    user_id = int(message.text.strip())
+    await state.clear()
+    await db.ban_user(user_id)
+    await answer_ui(message, f"🚫 <code>{user_id}</code> foydalanuvchisi <b>ban qilindi</b>.", reply_markup=admin_menu_kb())
+
+
 @router.callback_query(F.data == "adm_unban")
 @router.message(F.text == "Bandan chiqarish")
 async def unban_start(event: Message | CallbackQuery, state: FSMContext):
@@ -511,6 +795,17 @@ async def unban_start(event: Message | CallbackQuery, state: FSMContext):
     )
 
 
+@router.message(AdminStates.unban_waiting_id)
+async def unban_process(message: Message, state: FSMContext):
+    if not message.text or not message.text.strip().isdigit():
+        await answer_ui(message, "❗ Iltimos, to'g'ri raqamli ID kiriting.")
+        return
+    user_id = int(message.text.strip())
+    await state.clear()
+    await db.unban_user(user_id)
+    await answer_ui(message, f"✅ <code>{user_id}</code> foydalanuvchisi <b>bandan chiqarildi</b>.", reply_markup=admin_menu_kb())
+
+
 # ==================== SOZLAMALAR ====================
 
 @router.callback_query(F.data == "adm_settings")
@@ -519,7 +814,6 @@ async def settings_menu(event: Message | CallbackQuery):
     msg = event.message if isinstance(event, CallbackQuery) else event
     if isinstance(event, CallbackQuery):
         await event.answer()
-    from utils import get_required_channel
 
     channel = await get_required_channel()
     channel_text = channel if channel else "o'rnatilmagan"
@@ -533,6 +827,38 @@ async def settings_menu(event: Message | CallbackQuery):
         f"📢 Majburiy obuna kanali: <code>{channel_text}</code>",
         reply_markup=builder.as_markup(),
     )
+
+
+@router.callback_query(F.data == "set_req_channel")
+async def set_req_channel_cb(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(AdminStates.settings_waiting_channel)
+    await callback.answer()
+    await answer_ui(
+        callback.message,
+        "📢 <b>Yangi majburiy obuna kanalini kiriting:</b>\n\n"
+        "Masalan: <code>@kanal_nomi</code> yoki <code>-1001234567890</code>",
+        reply_markup=cancel_kb(),
+    )
+
+
+@router.message(AdminStates.settings_waiting_channel)
+async def set_req_channel_save(message: Message, state: FSMContext):
+    channel = message.text.strip()
+    await state.clear()
+    await db.set_setting("required_channel", channel)
+    await answer_ui(
+        message,
+        f"✅ Majburiy obuna kanali <code>{channel}</code> ga o'zgartirildi!",
+        reply_markup=admin_menu_kb(),
+    )
+
+
+@router.callback_query(F.data == "del_req_channel")
+async def del_req_channel_cb(callback: CallbackQuery):
+    await db.set_setting("required_channel", "")
+    await callback.answer("O'chirildi")
+    await edit_ui(callback.message, "✅ Majburiy obuna kanali o'chirildi.")
+    await answer_ui(callback.message, "🛠 Admin panel:", reply_markup=admin_menu_kb())
 
 
 # ==================== ZAXIRA NUSXA / TIKLASH ====================
@@ -567,6 +893,22 @@ async def restore_db_start(event: Message | CallbackQuery, state: FSMContext):
         "Iltimos, avval saqlangan zaxira faylini (.db) yuboring:",
         reply_markup=cancel_kb(),
     )
+
+
+@router.message(AdminStates.restore_waiting_file, F.document)
+async def restore_db_file(message: Message, state: FSMContext, bot: Bot):
+    doc = message.document
+    if not doc.file_name or not doc.file_name.endswith(".db"):
+        await answer_ui(message, "❗ Iltimos, faqat <code>.db</code> kengaytmali fayl yuboring.")
+        return
+    await state.clear()
+    try:
+        file = await bot.get_file(doc.file_id)
+        await bot.download_file(file.file_path, DB_PATH)
+        await db.init_db()
+        await answer_ui(message, "✅ <b>Ma'lumotlar bazasi muvaffaqiyatli tiklandi!</b>", reply_markup=admin_menu_kb())
+    except Exception as e:
+        await answer_ui(message, f"❌ Bazani tiklashda xatolik yuz berdi: {e}", reply_markup=admin_menu_kb())
 
 
 # ==================== PREMIUM CUSTOM EMOJI TEST ====================
@@ -610,7 +952,6 @@ async def emoji_test(event: Message | CallbackQuery):
     )
 
     await answer_ui(msg, "\n".join(lines), reply_markup=_emoji_test_kb())
-
 
 
 def _emoji_test_kb():

@@ -98,6 +98,17 @@ async def cmd_start(message: Message, state: FSMContext):
             if movie:
                 await deliver_movie(message.bot, message.chat.id, message.from_user.id, movie)
                 return
+            elif CHANNEL_ID:
+                try:
+                    await message.bot.copy_message(
+                        chat_id=message.chat.id,
+                        from_chat_id=CHANNEL_ID,
+                        message_id=code,
+                        protect_content=True,
+                    )
+                    return
+                except Exception:
+                    pass
         except ValueError:
             pass
 
@@ -156,6 +167,14 @@ async def cb_menu_vip(callback: CallbackQuery):
 
 @router.callback_query(F.data == "menu_categories")
 async def cb_menu_categories(callback: CallbackQuery):
+    if not await check_subscription(callback.bot, callback.from_user.id):
+        channel = await get_required_channel()
+        await answer_ui(callback.message,
+            "📢 <b>Botdan foydalanish uchun quyidagi kanalga a'zo bo'ling:</b>",
+            reply_markup=subscribe_kb(channel),
+        )
+        await callback.answer()
+        return
     await callback.answer()
     cats = await db.all_categories()
     if not cats:
@@ -169,6 +188,14 @@ async def cb_menu_categories(callback: CallbackQuery):
 
 @router.callback_query(F.data == "menu_order")
 async def cb_menu_order(callback: CallbackQuery, state: FSMContext):
+    if not await check_subscription(callback.bot, callback.from_user.id):
+        channel = await get_required_channel()
+        await answer_ui(callback.message,
+            "📢 <b>Botdan foydalanish uchun quyidagi kanalga a'zo bo'ling:</b>",
+            reply_markup=subscribe_kb(channel),
+        )
+        await callback.answer()
+        return
     await callback.answer()
     await state.set_state(UserStates.waiting_order_text)
     await answer_ui(callback.message,
@@ -180,6 +207,14 @@ async def cb_menu_order(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "menu_random")
 async def cb_menu_random(callback: CallbackQuery):
+    if not await check_subscription(callback.bot, callback.from_user.id):
+        channel = await get_required_channel()
+        await answer_ui(callback.message,
+            "📢 <b>Botdan foydalanish uchun quyidagi kanalga a'zo bo'ling:</b>",
+            reply_markup=subscribe_kb(channel),
+        )
+        await callback.answer()
+        return
     await callback.answer()
     movie = await db.random_movie()
     if not movie:
@@ -190,6 +225,14 @@ async def cb_menu_random(callback: CallbackQuery):
 
 @router.callback_query(F.data == "menu_search")
 async def cb_menu_search(callback: CallbackQuery, state: FSMContext):
+    if not await check_subscription(callback.bot, callback.from_user.id):
+        channel = await get_required_channel()
+        await answer_ui(callback.message,
+            "📢 <b>Botdan foydalanish uchun quyidagi kanalga a'zo bo'ling:</b>",
+            reply_markup=subscribe_kb(channel),
+        )
+        await callback.answer()
+        return
     await callback.answer()
     await state.set_state(UserStates.waiting_search_query)
     await answer_ui(callback.message,
@@ -379,6 +422,45 @@ async def movie_by_code(message: Message, state: FSMContext):
     await deliver_movie(message.bot, message.chat.id, message.from_user.id, movie)
 
 
+import re
+
+
+@router.message(F.via_bot)
+async def inline_message_sent(message: Message):
+    """
+    Foydalanuvchi inline qidiruvdan kinoni tanlaganda avtomatik kino videosini yetkazib beradi.
+    """
+    if await db.is_banned(message.from_user.id):
+        return
+    if not await check_subscription(message.bot, message.from_user.id):
+        channel = await get_required_channel()
+        await answer_ui(message,
+            "📢 <b>Kinoni tomosha qilish uchun quyidagi kanalga a'zo bo'ling:</b>",
+            reply_markup=subscribe_kb(channel),
+        )
+        return
+
+    text = message.text or ""
+    match = re.search(r"(?:kodi|kod|code):\s*(\d+)", text, re.IGNORECASE)
+    if match:
+        code = int(match.group(1))
+        movie = await db.get_movie(code)
+        if movie:
+            await deliver_movie(message.bot, message.chat.id, message.from_user.id, movie)
+            return
+        elif CHANNEL_ID:
+            try:
+                await message.bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=CHANNEL_ID,
+                    message_id=code,
+                    protect_content=True,
+                )
+                return
+            except Exception:
+                pass
+
+
 @router.message(F.text)
 async def movie_by_title_direct(message: Message, state: FSMContext):
     """
@@ -388,9 +470,15 @@ async def movie_by_title_direct(message: Message, state: FSMContext):
     """
     if await state.get_state() is not None:
         return
+    if message.via_bot:
+        return
 
     text = (message.text or "").strip()
     if not text or text.startswith("/"):
+        return
+
+    # Inline natijalar yoki uzun matnlarni oddiy nom qidiruvi sifatida qabul qilmaslik
+    if "kino kodi:" in text.lower() or "janr:" in text.lower() or "\n" in text:
         return
 
     # Do not treat the UI buttons as movie titles.
@@ -420,10 +508,6 @@ async def movie_by_title_direct(message: Message, state: FSMContext):
         "Emojilarni tekshirish",
     }
     if text in known_ui:
-        return
-
-    # Admin messages are handled by the admin router.
-    if is_admin(message.from_user.id):
         return
 
     if await db.is_banned(message.from_user.id):

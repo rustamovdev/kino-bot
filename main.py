@@ -61,23 +61,26 @@ async def main():
     logging.info("🤖 Bot ishga tushdi...")
 
     # Render Web Service uchun Health Check serveri (PORT tinglash)
-    import os
-    from aiohttp import web
+    try:
+        import os
+        from aiohttp import web
 
-    async def handle_ping(request):
-        return web.Response(text="Bot is running! 🤖")
+        async def handle_ping(request):
+            return web.Response(text="Bot is running! 🤖")
 
-    app = web.Application()
-    app.router.add_get("/", handle_ping)
-    app.router.add_get("/ping", handle_ping)
-    app.router.add_get("/health", handle_ping)
+        app = web.Application()
+        app.router.add_get("/", handle_ping)
+        app.router.add_get("/ping", handle_ping)
+        app.router.add_get("/health", handle_ping)
 
-    port = int(os.getenv("PORT", "10000"))
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
-    logging.info(f"🌐 Health-check server PORT {port} da ishga tushdi.")
+        port = int(os.getenv("PORT", "10000"))
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", port)
+        await site.start()
+        logging.info(f"🌐 Health-check server PORT {port} da ishga tushdi.")
+    except Exception as e:
+        logging.warning(f"⚠️ Health-check serverni ishga tushirishda ogohlantirish: {e}")
 
     await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
 

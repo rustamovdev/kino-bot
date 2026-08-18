@@ -408,7 +408,7 @@ async def search_movies(query: str, limit: int = 50, offset: int = 0):
     if is_postgres():
         async with _pg_pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT * FROM movies WHERE title ILIKE $1 ORDER BY added_at DESC LIMIT $2 OFFSET $3",
+                "SELECT * FROM movies WHERE title ILIKE $1 OR CAST(code AS TEXT) LIKE $1 ORDER BY added_at DESC LIMIT $2 OFFSET $3",
                 f"%{query}%", limit, offset
             )
             return [dict(r) for r in rows]
@@ -417,8 +417,8 @@ async def search_movies(query: str, limit: int = 50, offset: int = 0):
         async with aiosqlite.connect(DB_PATH) as db:
             db.row_factory = aiosqlite.Row
             cur = await db.execute(
-                "SELECT * FROM movies WHERE title LIKE ? ORDER BY added_at DESC LIMIT ? OFFSET ?",
-                (f"%{query}%", limit, offset),
+                "SELECT * FROM movies WHERE title LIKE ? OR CAST(code AS TEXT) LIKE ? ORDER BY added_at DESC LIMIT ? OFFSET ?",
+                (f"%{query}%", f"%{query}%", limit, offset),
             )
             rows = await cur.fetchall()
             return [dict(r) for r in rows]
@@ -578,6 +578,20 @@ async def all_orders():
             cur = await db.execute("SELECT * FROM orders ORDER BY created_at DESC")
             rows = await cur.fetchall()
             return [dict(r) for r in rows]
+
+
+async def get_order(order_id: int):
+    if is_postgres():
+        async with _pg_pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT * FROM orders WHERE id = $1", order_id)
+            return dict(row) if row else None
+    else:
+        import aiosqlite
+        async with aiosqlite.connect(DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT * FROM orders WHERE id = ?", (order_id,))
+            row = await cur.fetchone()
+            return dict(row) if row else None
 
 
 async def close_order(order_id: int):

@@ -112,9 +112,16 @@ def back_to_main_kb() -> InlineKeyboardMarkup:
 
 
 def subscribe_kb(channel_username: str) -> InlineKeyboardMarkup:
-    username = channel_username.lstrip("@")
+    ch = (channel_username or "").strip()
+    if ch.startswith("https://") or ch.startswith("http://"):
+        url = ch
+    elif ch.startswith("-100"):
+        url = f"https://t.me/c/{ch.replace('-100', '')}"
+    else:
+        username = ch.lstrip("@")
+        url = f"https://t.me/{username}"
     builder = InlineKeyboardBuilder()
-    _ikb_button(builder, "channel", "Kanalga a'zo bo'lish", url=f"https://t.me/{username}", style=ButtonStyle.PRIMARY)
+    _ikb_button(builder, "channel", "Kanalga a'zo bo'lish", url=url, style=ButtonStyle.PRIMARY)
     _ikb_button(builder, "confirm", "Tekshirish", callback_data="check_sub", style=ButtonStyle.SUCCESS)
     builder.adjust(1)
     return builder.as_markup()
