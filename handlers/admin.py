@@ -439,7 +439,27 @@ async def index_channel_start(event: Message | CallbackQuery, state: FSMContext)
                 message_id=code,
                 disable_notification=True,
             )
-            caption = (fwd.caption or fwd.text or f"Kino #{code}").strip().split("\n")[0][:150]
+            raw_text = (fwd.caption or fwd.text or "").strip()
+            # Agar bu faqat e'lon matni bo'lsa (video yoki fayl bo'lmasa), o'tkazib yuboramiz
+            if not fwd.video and not fwd.document and not fwd.animation and ("Yangi kino" in raw_text or "kino qo'shildi" in raw_text):
+                try:
+                    await fwd.delete()
+                except Exception:
+                    pass
+                code += 1
+                empty_streak = 0
+                continue
+
+            caption = raw_text.split("\n")[0][:150] if raw_text else f"Kino #{code}"
+            if "Yangi kino" in caption:
+                try:
+                    await fwd.delete()
+                except Exception:
+                    pass
+                code += 1
+                empty_streak = 0
+                continue
+
             await db.add_movie(code, caption, "Umumiy", is_vip_movie=0)
             added += 1
             empty_streak = 0
